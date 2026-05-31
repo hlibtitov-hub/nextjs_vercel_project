@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { Job, JobStatus, User } from '@/types'
 
+const API = process.env.NEXT_PUBLIC_API_URL
+
 interface AuthState {
   user: User | null
   token: string | null
@@ -13,24 +15,16 @@ interface AuthState {
 
 interface JobState {
   jobs: Job[]
+  isLoading: boolean
   searchQuery: string
   statusFilter: JobStatus | 'all'
-  addJob: (job: Omit<Job, 'id' | 'createdAt'>) => void
-  updateJob: (id: string, updates: Partial<Job>) => void
-  deleteJob: (id: string) => void
+  fetchJobs: (token: string) => Promise<void>
+  addJob: (job: Omit<Job, 'id' | 'createdAt'>, token: string) => Promise<void>
+  updateJob: (id: string, updates: Partial<Job>, token: string) => Promise<void>
+  deleteJob: (id: string, token: string) => Promise<void>
   setSearch: (q: string) => void
   setFilter: (s: JobStatus | 'all') => void
 }
-
-const MOCK_USER: User = { id: '1', name: 'Alex Ivanov', email: 'alex@example.com' }
-
-const MOCK_JOBS: Job[] = [
-  { id: '1', company: 'Google', role: 'Frontend Engineer', status: 'Interview', location: 'Remote', salary: '$120k', url: '', notes: 'Technical screen passed', createdAt: '2026-05-20' },
-  { id: '2', company: 'Stripe', role: 'Full Stack Developer', status: 'Applied', location: 'San Francisco', salary: '$130k', url: '', notes: 'Applied via LinkedIn', createdAt: '2026-05-22' },
-  { id: '3', company: 'Vercel', role: 'Software Engineer', status: 'Offer', location: 'Remote', salary: '$140k', url: '', notes: 'Offer received!', createdAt: '2026-05-15' },
-  { id: '4', company: 'Airbnb', role: 'React Developer', status: 'Rejected', location: 'New York', salary: '$110k', url: '', notes: '', createdAt: '2026-05-10' },
-  { id: '5', company: 'Notion', role: 'Product Engineer', status: 'Applied', location: 'Remote', salary: '$115k', url: '', notes: '', createdAt: '2026-05-28' },
-]
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -39,17 +33,34 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       login: async (email, password) => {
-        await new Promise((r) => setTimeout(r, 800))
-        if (email === 'alex@example.com' && password === 'password') {
-          set({ user: MOCK_USER, token: 'mock-jwt-token', isAuthenticated: true })
+        try {
+          const res = await fetch(`${API}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          })
+          const data = await res.json()
+          if (!res.ok) return false
+          set({ user: data.user, token: data.token, isAuthenticated: true })
           return true
+        } catch {
+          return false
         }
-        return false
       },
-      register: async (name, email) => {
-        await new Promise((r) => setTimeout(r, 800))
-        set({ user: { id: '2', name, email }, token: 'mock-jwt-token', isAuthenticated: true })
-        return true
+      register: async (name, email, password) => {
+        try {
+          const res = await fetch(`${API}/api/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, password }),
+          })
+          const data = await res.json()
+          if (!res.ok) return false
+          set({ user: data.user, token: data.token, isAuthenticated: true })
+          return true
+        } catch {
+          return false
+        }
       },
       logout: () => set({ user: null, token: null, isAuthenticated: false }),
     }),
@@ -58,20 +69,52 @@ export const useAuthStore = create<AuthState>()(
 )
 
 export const useJobStore = create<JobState>()(
-  persist(
-    (set, get) => ({
-      jobs: MOCK_JOBS,
-      searchQuery: '',
-      statusFilter: 'all',
-      addJob: (job) => {
-        const newJob: Job = { ...job, id: Date.now().toString(), createdAt: new Date().toISOString().split('T')[0] }
-        set({ jobs: [newJob, ...get().jobs] })
-      },
-      updateJob: (id, updates) => set({ jobs: get().jobs.map((j) => (j.id === id ? { ...j, ...updates } : j)) }),
-      deleteJob: (id) => set({ jobs: get().jobs.filter((j) => j.id !== id) }),
-      setSearch: (searchQuery) => set({ searchQuery }),
-      setFilter: (statusFilter) => set({ statusFilter }),
-    }),
-    { name: 'jobs-storage' }
-  )
+  (set, get) => ({
+    jobs: [],
+    isLoading: false,
+    searchQuery: '',
+    statusFilter: 'all',
+    fetchJobs: async (token) => {
+      set({ isLoading: true })
+      try {
+        const res = await fetch(`${API}/api/jobs`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const data = await res.json()
+        const jobs = data.jobs.map((j: any) => ({ ...j, id: j._id, createdAt: j.createdAt?.split('T')[0] }))
+        set({ jobs, isLoading: false })
+      } catch {
+        set({ isLoading: false })
+      }
+    },
+    addJob: async (job, token) => {
+      const res = await fetch(`${API}/api/jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(job),
+      })
+      const data = await res.json()
+      const newJob = { ...data.job, id: data.job._id, createdAt: data.job.createdAt?.split('T')[0] }
+      set({ jobs: [newJob, ...get().jobs] })
+    },
+    updateJob: async (id, updates, token) => {
+      const res = await fetch(`${API}/api/jobs/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(updates),
+      })
+      const data = await res.json()
+      const updated = { ...data.job, id: data.job._id, createdAt: data.job.createdAt?.split('T')[0] }
+      set({ jobs: get().jobs.map((j) => (j.id === id ? updated : j)) })
+    },
+    deleteJob: async (id, token) => {
+      await fetch(`${API}/api/jobs/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      set({ jobs: get().jobs.filter((j) => j.id !== id) })
+    },
+    setSearch: (searchQuery) => set({ searchQuery }),
+    setFilter: (statusFilter) => set({ statusFilter }),
+  })
 )

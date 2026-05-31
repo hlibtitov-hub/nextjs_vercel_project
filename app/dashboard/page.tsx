@@ -8,13 +8,14 @@ import { JobStatus, STATUS_CONFIG } from '@/types'
 const STATUSES: JobStatus[] = ['Applied', 'Interview', 'Offer', 'Rejected']
 
 export default function DashboardPage() {
-  const { isAuthenticated, user } = useAuthStore()
-  const { jobs } = useJobStore()
+  const { isAuthenticated, user, token } = useAuthStore()
+  const { jobs, fetchJobs } = useJobStore()
   const router = useRouter()
 
   useEffect(() => {
     if (!isAuthenticated) router.replace('/login')
-  }, [isAuthenticated, router])
+    else if (token) fetchJobs(token)
+  }, [isAuthenticated, token, router])
 
   if (!isAuthenticated) return null
 
@@ -28,7 +29,9 @@ export default function DashboardPage() {
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-neutral-900">Good morning, {user?.name?.split(' ')[0]} 👋</h1>
+          <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
+            Good morning, {user?.name?.split(' ')[0]} 👋
+          </h1>
           <p className="text-neutral-500 text-sm mt-1">Here is your job search overview</p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">

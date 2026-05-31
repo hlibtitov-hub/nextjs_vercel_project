@@ -6,6 +6,7 @@ import { useJobStore } from '@/store/useJobStore'
 interface Props {
   job?: Job | null
   onClose: () => void
+  token: string
 }
 
 const STATUSES: JobStatus[] = ['Applied', 'Interview', 'Offer', 'Rejected']
@@ -15,12 +16,13 @@ const empty = {
   location: '', salary: '', url: '', notes: '',
 }
 
-export default function JobModal({ job, onClose }: Props) {
+export default function JobModal({ job, onClose, token }: Props) {
   const { addJob, updateJob } = useJobStore()
   const [form, setForm] = useState(job ? {
     company: job.company, role: job.role, status: job.status,
     location: job.location, salary: job.salary, url: job.url, notes: job.notes,
   } : empty)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -30,10 +32,12 @@ export default function JobModal({ job, onClose }: Props) {
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (job) updateJob(job.id, form)
-    else addJob(form)
+    setLoading(true)
+    if (job) await updateJob(job.id, form, token)
+    else await addJob(form, token)
+    setLoading(false)
     onClose()
   }
 
@@ -99,8 +103,9 @@ export default function JobModal({ job, onClose }: Props) {
               className="flex-1 py-2.5 rounded-xl border border-neutral-200 text-sm font-medium text-neutral-600 hover:bg-neutral-50 transition">
               Cancel
             </button>
-            <button type="submit"
-              className="flex-1 py-2.5 rounded-xl bg-neutral-900 text-white text-sm font-medium hover:bg-neutral-800 transition-all">
+            <button type="submit" disabled={loading}
+              className="flex-1 py-2.5 rounded-xl bg-neutral-900 text-white text-sm font-medium hover:bg-neutral-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+              {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
               {job ? 'Save Changes' : 'Add Job'}
             </button>
           </div>

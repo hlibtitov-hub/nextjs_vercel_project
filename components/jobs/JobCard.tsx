@@ -7,7 +7,7 @@ import JobModal from './JobModal'
 
 const STATUSES: JobStatus[] = ['Applied', 'Interview', 'Offer', 'Rejected']
 
-export default function JobCard({ job }: { job: Job }) {
+export default function JobCard({ job, token }: { job: Job; token: string }) {
   const { updateJob, deleteJob } = useJobStore()
   const [editing, setEditing] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
@@ -40,7 +40,7 @@ export default function JobCard({ job }: { job: Job }) {
                     className="w-full text-left px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
                     Edit
                   </button>
-                  <button onClick={() => { deleteJob(job.id); setShowMenu(false) }}
+                  <button onClick={() => { deleteJob(job.id, token); setShowMenu(false) }}
                     className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50">
                     Delete
                   </button>
@@ -64,7 +64,7 @@ export default function JobCard({ job }: { job: Job }) {
           </span>
           <div className="flex gap-1">
             {STATUSES.map(s => (
-              <button key={s} onClick={() => updateJob(job.id, { status: s })} title={s}
+              <button key={s} onClick={() => updateJob(job.id, { status: s }, token)} title={s}
                 className={`w-2 h-2 rounded-full transition-all ${
                   job.status === s ? STATUS_CONFIG[s].dot + ' scale-125' : 'bg-neutral-200 hover:bg-neutral-300'
                 }`} />
@@ -78,7 +78,7 @@ export default function JobCard({ job }: { job: Job }) {
           )}
         </div>
       </div>
-      {editing && <JobModal job={job} onClose={() => setEditing(false)} />}
+      {editing && <JobModal job={job} onClose={() => setEditing(false)} token={token} />}
     </>
   )
 }

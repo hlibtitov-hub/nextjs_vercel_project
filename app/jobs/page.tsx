@@ -10,14 +10,15 @@ import { JobStatus } from '@/types'
 const FILTERS: (JobStatus | 'all')[] = ['all', 'Applied', 'Interview', 'Offer', 'Rejected']
 
 export default function JobsPage() {
-  const { isAuthenticated } = useAuthStore()
-  const { jobs, searchQuery, statusFilter, setSearch, setFilter } = useJobStore()
+  const { isAuthenticated, token } = useAuthStore()
+  const { jobs, searchQuery, statusFilter, setSearch, setFilter, fetchJobs, isLoading } = useJobStore()
   const [showAdd, setShowAdd] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
     if (!isAuthenticated) router.replace('/login')
-  }, [isAuthenticated, router])
+    else if (token) fetchJobs(token)
+  }, [isAuthenticated, token, router])
 
   if (!isAuthenticated) return null
 
@@ -61,7 +62,11 @@ export default function JobsPage() {
             ))}
           </div>
         </div>
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <div className="w-6 h-6 border-2 border-neutral-300 border-t-neutral-800 rounded-full animate-spin" />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-4xl mb-3">📋</p>
             <p className="font-medium text-neutral-700">{jobs.length === 0 ? 'No applications yet' : 'No results found'}</p>
@@ -69,11 +74,11 @@ export default function JobsPage() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filtered.map(job => <JobCard key={job.id} job={job} />)}
+            {filtered.map(job => <JobCard key={job.id} job={job} token={token!} />)}
           </div>
         )}
       </main>
-      {showAdd && <JobModal onClose={() => setShowAdd(false)} />}
+      {showAdd && <JobModal onClose={() => setShowAdd(false)} token={token!} />}
     </div>
   )
 }
